@@ -57,14 +57,19 @@ setInterval(updateClock, 1000);
    APP STATE
    ============================================================ */
 const STORAGE_KEY = 'sniplink_urls';
-const APP_ORIGIN = window.location.origin + window.location.pathname;
+let basePath = window.location.pathname;
+if (basePath.endsWith('index.html')) basePath = basePath.slice(0, -10);
+if (!basePath.endsWith('/')) basePath += '/';
+const APP_ORIGIN = window.location.origin + basePath;
+const DISPLAY_ORIGIN = APP_ORIGIN.replace(/^https?:\/\//, '');
 
-/* Hash-based redirect */
+/* Redirect handler (Supports both ?s= and #) */
 (function handleRedirect() {
-  const hash = window.location.hash.slice(1);
-  if (!hash) return;
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('s') || window.location.hash.slice(1);
+  if (!id) return;
   const links = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  const match = links.find(l => l.shortId === hash);
+  const match = links.find(l => l.shortId === id);
   if (match) {
     match.clicks = (match.clicks || 0) + 1;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
@@ -78,7 +83,7 @@ function loadLinks() {
 }
 function saveLinks(l) { localStorage.setItem(STORAGE_KEY, JSON.stringify(l)); }
 
-function genId(n = 6) {
+function genId(n = 4) {
   const c = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let r = '';
   for (let i = 0; i < n; i++) r += c[~~(Math.random() * c.length)];
@@ -114,6 +119,7 @@ const linksBody = $('linksBody');
 const emptyListview = $('emptyListview');
 const statusText = $('statusText');
 let lastCreatedUrl = '';
+let lastDisplayUrl = '';
 
 /* ============================================================
    CUSTOM NAME CHECKBOX
@@ -142,12 +148,14 @@ shortenBtn.addEventListener('click', () => {
   }
 
   const shortId = custom || genId();
-  const realUrl = `${APP_ORIGIN}#${shortId}`;
+  const fullUrl = `${APP_ORIGIN}?s=${shortId}`;
+  const displayUrl = `${DISPLAY_ORIGIN}?s=${shortId}`;
   links.unshift({ original: url, shortId, customName: custom || '', clicks: 0, createdAt: Date.now() });
   saveLinks(links);
 
-  lastCreatedUrl = realUrl;
-  resultUrl.value = realUrl;
+  lastCreatedUrl = fullUrl;
+  lastDisplayUrl = displayUrl;
+  resultUrl.value = displayUrl;
   resultPanel.classList.add('active');
   statusText.textContent = `Snipped: ${shortId}`;
 
@@ -169,7 +177,7 @@ clearBtn.addEventListener('click', () => {
    COPY
    ============================================================ */
 copyResultBtn.addEventListener('click', () => { playBlip(); doCopy(resultUrl.value, copyResultBtn); });
-$('tbCopy').addEventListener('click', () => { playBlip(); if (lastCreatedUrl) doCopy(lastCreatedUrl, null); });
+$('tbCopy').addEventListener('click', () => { playBlip(); if (lastDisplayUrl) doCopy(lastDisplayUrl, null); });
 
 function doCopy(text, btn) {
   navigator.clipboard.writeText(text).catch(() => {
@@ -182,7 +190,7 @@ function doCopy(text, btn) {
   });
 
   const links = loadLinks();
-  const shortId = text.split('#')[1];
+  const shortId = text.includes('?s=') ? text.split('?s=')[1] : text.split('#')[1];
   const idx = links.findIndex(l => l.shortId === shortId);
   if (idx !== -1) { links[idx].clicks++; saveLinks(links); renderLinks(); }
 
@@ -304,18 +312,19 @@ function renderLinks() {
 
   links.forEach((link, idx) => {
     const tr = document.createElement('tr');
-    const realUrl = `${APP_ORIGIN}#${link.shortId}`;
+    const displayUrl = `${DISPLAY_ORIGIN}?s=${link.shortId}`;
+    const fullUrl = `${APP_ORIGIN}?s=${link.shortId}`;
     const d = new Date(link.createdAt);
     const ds = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 
     tr.innerHTML = `
-      <td><a href="${realUrl}" target="_blank" style="color:#000080;text-decoration:underline;cursor:pointer">${esc(link.shortId)}</a></td>
+      <td><a href="${fullUrl}" target="_blank" style="color:#000080;text-decoration:underline;cursor:pointer">${esc(link.shortId)}</a></td>
       <td title="${esc(link.original)}">${esc(link.original)}</td>
       <td style="text-align:center">${link.clicks}</td>
       <td>${ds}</td>
       <td>
-        <button class="lv-action-btn" data-action="copy" data-url="${realUrl}">📋</button>
-        <button class="lv-action-btn" data-action="qr" data-url="${realUrl}">📱</button>
+        <button class="lv-action-btn" data-action="copy" data-url="${displayUrl}">📋</button>
+        <button class="lv-action-btn" data-action="qr" data-url="${fullUrl}">📱</button>
         <button class="lv-action-btn" data-action="del" data-idx="${idx}">🗑️</button>
       </td>`;
     linksBody.appendChild(tr);
