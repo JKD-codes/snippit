@@ -67,13 +67,20 @@ const DISPLAY_ORIGIN = APP_ORIGIN.replace(/^https?:\/\//, '');
 (function handleRedirect() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('s') || window.location.hash.slice(1);
-  if (!id) return;
+  const fallback = params.get('o');
+  
+  if (!id && !fallback) return;
+  
   const links = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   const match = links.find(l => l.shortId === id);
   if (match) {
     match.clicks = (match.clicks || 0) + 1;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
     window.location.replace(match.original);
+  } else if (fallback) {
+    try {
+      window.location.replace(decodeURIComponent(fallback));
+    } catch (e) {}
   }
 })();
 
@@ -120,6 +127,7 @@ const emptyListview = $('emptyListview');
 const statusText = $('statusText');
 let lastCreatedUrl = '';
 let lastDisplayUrl = '';
+let lastQrUrl = '';
 
 /* ============================================================
    CUSTOM NAME CHECKBOX
@@ -150,11 +158,13 @@ shortenBtn.addEventListener('click', () => {
   const shortId = custom || genId();
   const fullUrl = `${APP_ORIGIN}?s=${shortId}`;
   const displayUrl = `${DISPLAY_ORIGIN}?s=${shortId}`;
+  const qrUrl = `${APP_ORIGIN}?s=${shortId}&o=${encodeURIComponent(url)}`;
   links.unshift({ original: url, shortId, customName: custom || '', clicks: 0, createdAt: Date.now() });
   saveLinks(links);
 
   lastCreatedUrl = fullUrl;
   lastDisplayUrl = displayUrl;
+  lastQrUrl = qrUrl;
   resultUrl.value = displayUrl;
   resultPanel.classList.add('active');
   statusText.textContent = `Snipped: ${shortId}`;
@@ -206,7 +216,7 @@ function doCopy(text, btn) {
    QR CODE
    ============================================================ */
 let qrInstance = null;
-viewQrBtn.addEventListener('click', () => { playBlip(); showQrDialog(lastCreatedUrl); });
+viewQrBtn.addEventListener('click', () => { playBlip(); showQrDialog(lastQrUrl); });
 
 function showQrDialog(url) {
   $('qrDialogUrl').textContent = url;
@@ -314,6 +324,7 @@ function renderLinks() {
     const tr = document.createElement('tr');
     const displayUrl = `${DISPLAY_ORIGIN}?s=${link.shortId}`;
     const fullUrl = `${APP_ORIGIN}?s=${link.shortId}`;
+    const qrUrl = `${APP_ORIGIN}?s=${link.shortId}&o=${encodeURIComponent(link.original)}`;
     const d = new Date(link.createdAt);
     const ds = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 
@@ -324,7 +335,7 @@ function renderLinks() {
       <td>${ds}</td>
       <td>
         <button class="lv-action-btn" data-action="copy" data-url="${displayUrl}">📋</button>
-        <button class="lv-action-btn" data-action="qr" data-url="${fullUrl}">📱</button>
+        <button class="lv-action-btn" data-action="qr" data-url="${qrUrl}">📱</button>
         <button class="lv-action-btn" data-action="del" data-idx="${idx}">🗑️</button>
       </td>`;
     linksBody.appendChild(tr);
