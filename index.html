@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snippit</title>
+  <meta name="description" content="A Windows 95 themed URL shortener with QR codes and click tracking." />
+  <link rel="icon" href="logo.png" type="image/png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- BOOT SPLASH -->
+  <div id="bootSplash">
+    <img class="boot-logo" src="logo.png" alt="Snippit" />
+    <div class="boot-title">✂️ Snippit</div>
+    <div class="boot-subtitle">Starting Windows...</div>
+    <div class="boot-progress-outer" id="bootProgress"></div>
+    <div class="boot-subtitle" style="margin-top:8px;color:#555">© Snippit Corporation, 1995.</div>
+  </div>
+
+  <!-- DESKTOP -->
+  <div class="desktop" id="desktop" style="display:none">
+    <div class="desktop-icons">
+      <div class="desktop-icon"><span class="icon-img">🖥️</span><span class="icon-label">My Computer</span></div>
+      <div class="desktop-icon"><span class="icon-img">🗑️</span><span class="icon-label">Recycle Bin</span></div>
+      <div class="desktop-icon"><span class="icon-img">📁</span><span class="icon-label">My Links</span></div>
+    </div>
+
+    <!-- MAIN WINDOW -->
+    <div class="win-window" id="mainWindow" style="left:50%;top:50%;transform:translate(-50%,-50%);width:680px;max-height:calc(100vh - 60px);">
+      <div class="win-titlebar">
+        <img class="title-logo" src="logo.png" alt="" />
+        <span class="title-text">✂️ Snippit</span>
+        <div class="win-titlebar-btns">
+          <button class="win-titlebar-btn">─</button>
+          <button class="win-titlebar-btn">□</button>
+          <button class="win-titlebar-btn" id="mainCloseBtn">✕</button>
+        </div>
+      </div>
+      <div class="win-menubar">
+        <span class="win-menu-item"><u>F</u>ile</span>
+        <span class="win-menu-item"><u>E</u>dit</span>
+        <span class="win-menu-item"><u>V</u>iew</span>
+        <span class="win-menu-item"><u>H</u>elp</span>
+      </div>
+      <div class="win-toolbar">
+        <button class="win-toolbar-btn" id="tbNew" title="New Link">📄 <span class="tb-text">New</span></button>
+        <button class="win-toolbar-btn" id="tbCopy" title="Copy Link">📋 <span class="tb-text">Copy</span></button>
+        <div class="toolbar-sep"></div>
+        <button class="win-toolbar-btn" id="tbHelp" title="About">❓ <span class="tb-text">Help</span></button>
+      </div>
+
+      <div class="win-body">
+        <!-- Input -->
+        <div class="group-box">
+          <span class="group-box-title">✂️ Snip a Link</span>
+          <div class="form-row">
+            <label class="form-label" for="longUrl">Long URL:</label>
+            <input type="url" class="win-input form-input" id="longUrl" placeholder="http://" />
+          </div>
+          <div class="form-row">
+            <span class="form-label"></span>
+            <label class="win-checkbox"><input type="checkbox" id="customCheck" /> Use custom short name</label>
+          </div>
+          <div class="form-row" id="customRow" style="display:none">
+            <label class="form-label" for="customName">Short name:</label>
+            <input type="text" class="win-input form-input" id="customName" placeholder="my-link" />
+          </div>
+          <div class="btn-row" style="margin-left:78px;">
+            <button class="win-btn win-btn-default" id="shortenBtn">✂️ Snip it</button>
+            <button class="win-btn" id="clearBtn">Clear</button>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div class="result-panel" id="resultPanel">
+          <div class="group-box">
+            <span class="group-box-title">Result</span>
+            <div class="form-row">
+              <label class="form-label">Short Link:</label>
+              <input type="text" class="win-input form-input" id="resultUrl" readonly />
+              <button class="win-btn" id="copyResultBtn" style="min-width:55px">🖨️ Copy</button>
+            </div>
+            <div class="btn-row" style="margin-left:78px;">
+              <button class="win-btn" id="viewQrBtn">📱 View QR Code</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Links Table -->
+        <div class="listview-wrapper">
+          <div class="group-box">
+            <span class="group-box-title">📁 Snipped Links</span>
+            <div class="sunken-panel" style="max-height:200px;overflow-y:auto;">
+              <table class="listview" id="linksTable">
+                <thead>
+                  <tr>
+                    <th>Short Link</th>
+                    <th>Destination</th>
+                    <th>Clicks</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="linksBody"></tbody>
+              </table>
+              <div class="empty-listview" id="emptyListview">No items to display.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="win-statusbar"><span class="status-section" id="statusText">Ready</span></div>
+    </div>
+  </div>
+
+  <!-- QR DIALOG -->
+  <div class="dialog-overlay" id="qrDialog">
+    <div class="dialog-window" style="width:300px;max-width:90vw">
+      <div class="win-titlebar">
+        <span class="title-text">QR Code — Snippit</span>
+        <div class="win-titlebar-btns"><button class="win-titlebar-btn" id="qrCloseX">✕</button></div>
+      </div>
+      <div class="qr-dialog-body">
+        <div class="qr-url" id="qrDialogUrl"></div>
+        <div id="qrCodeContainer"></div>
+        <div style="display:flex;gap:6px">
+          <button class="win-btn" id="qrDownloadBtn">💾 Download</button>
+          <button class="win-btn" id="qrCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUCCESS DIALOG -->
+  <div class="dialog-overlay" id="successDialog">
+    <div class="dialog-window">
+      <div class="win-titlebar">
+        <span class="title-text">Snippit</span>
+        <div class="win-titlebar-btns"><button class="win-titlebar-btn" id="successCloseX">✕</button></div>
+      </div>
+      <div class="dialog-body">
+        <span class="dialog-icon">✅</span>
+        <span class="dialog-text">Link snipped successfully!<br>Click OK to continue.</span>
+      </div>
+      <div class="dialog-btns"><button class="win-btn win-btn-default" id="successOkBtn">OK</button></div>
+    </div>
+  </div>
+
+  <!-- ERROR DIALOG -->
+  <div class="dialog-overlay" id="errorDialog">
+    <div class="dialog-window">
+      <div class="win-titlebar">
+        <span class="title-text">Snippit</span>
+        <div class="win-titlebar-btns"><button class="win-titlebar-btn" id="errorCloseX">✕</button></div>
+      </div>
+      <div class="dialog-body">
+        <span class="dialog-icon">⚠️</span>
+        <span class="dialog-text" id="errorDialogText">An error occurred.</span>
+      </div>
+      <div class="dialog-btns"><button class="win-btn win-btn-default" id="errorOkBtn">OK</button></div>
+    </div>
+  </div>
+
+  <!-- ABOUT DIALOG -->
+  <div class="dialog-overlay" id="aboutDialog">
+    <div class="dialog-window" style="width:300px;max-width:90vw">
+      <div class="win-titlebar">
+        <span class="title-text">About Snippit</span>
+        <div class="win-titlebar-btns"><button class="win-titlebar-btn" id="aboutCloseX">✕</button></div>
+      </div>
+      <div class="dialog-body" style="flex-direction:column;align-items:center;text-align:center;">
+        <img src="logo.png" alt="Snippit" style="width:48px;height:48px;image-rendering:pixelated" />
+        <div style="font-weight:bold;font-size:13px;margin:4px 0">✂️ Snippit</div>
+        <div>Version 1.0</div>
+        <div style="margin-top:6px;color:#808080">A nostalgic URL shortener<br>in the style of Windows 95.</div>
+        <div style="margin-top:8px;font-size:10px;color:#808080">Powered by localStorage™</div>
+      </div>
+      <div class="dialog-btns"><button class="win-btn win-btn-default" id="aboutOkBtn">OK</button></div>
+    </div>
+  </div>
+
+  <!-- START MENU -->
+  <div class="start-menu" id="startMenu">
+    <div class="start-menu-sidebar"><span>Snippit</span></div>
+    <div class="start-menu-items">
+      <div class="start-menu-item"><span class="smi-icon">📁</span> Programs</div>
+      <div class="start-menu-item"><span class="smi-icon">📄</span> Documents</div>
+      <div class="start-menu-item"><span class="smi-icon">⚙️</span> Settings</div>
+      <div class="start-menu-item"><span class="smi-icon">🔍</span> Find</div>
+      <div class="start-menu-item"><span class="smi-icon">❓</span> Help</div>
+      <div class="start-menu-sep"></div>
+      <div class="start-menu-item" id="shutdownItem"><span class="smi-icon">🔌</span> <b>Shut Down...</b></div>
+    </div>
+  </div>
+
+  <!-- TASKBAR -->
+  <div class="taskbar" id="taskbar" style="display:none">
+    <button class="start-btn" id="startBtn"><span class="win-logo">🪟</span> Start</button>
+    <div class="taskbar-apps">
+      <button class="taskbar-app-btn">
+        ✂️ <span class="tb-label-full">Snippit</span><span class="tb-label-short">Snippit</span>
+      </button>
+    </div>
+    <div class="taskbar-tray">
+      <span>🔊</span>
+      <span id="trayClock">--:--</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
