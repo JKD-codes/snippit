@@ -9,5 +9,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "@vercel/kv": "^3.0.0",
+    "ioredis": "^5.10.1"
+  }
 }

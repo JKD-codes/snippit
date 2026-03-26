@@ -73,14 +73,32 @@ const DISPLAY_ORIGIN = APP_ORIGIN.replace(/^https?:\/\//, '');
   
   const links = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   const match = links.find(l => l.shortId === id);
-  if (match) {
-    match.clicks = (match.clicks || 0) + 1;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
-    window.location.replace(match.original);
+  
+  if (id) {
+    // Fetch from global Redis database
+    fetch(`/api/getLink?id=${id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.url) {
+          // Update local history clicks if it happened to be created by this device
+          if (match) {
+            match.clicks = (match.clicks || 0) + 1;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+          }
+          window.location.replace(data.url);
+        } else if (fallback) {
+          try { window.location.replace(decodeURIComponent(fallback)); } catch (e) {}
+        } else {
+          document.body.innerHTML = '<div style="padding:20px;font-family:Arial"><h2>Error 404</h2><p>This Snippit link was not found in the global database.</p></div>';
+        }
+      })
+      .catch(() => {
+        // Fallback if API fails
+        if (match) window.location.replace(match.original);
+        else if (fallback) try { window.location.replace(decodeURIComponent(fallback)); } catch (e) {}
+      });
   } else if (fallback) {
-    try {
-      window.location.replace(decodeURIComponent(fallback));
-    } catch (e) {}
+    try { window.location.replace(decodeURIComponent(fallback)); } catch (e) {}
   }
 })();
 
@@ -141,7 +159,7 @@ customCheck.addEventListener('change', () => {
 /* ============================================================
    SHORTEN
    ============================================================ */
-shortenBtn.addEventListener('click', () => {
+shortenBtn.addEventListener('click', async () => {
   playBlip();
   const url = longUrlInput.value.trim();
   const custom = customNameInput.value.trim().replace(/[^a-zA-Z0-9\-_]/g, '');
@@ -149,28 +167,47 @@ shortenBtn.addEventListener('click', () => {
   if (!url) { showErrorDialog('Please enter a URL.'); return; }
   if (!isValidUrl(url)) { showErrorDialog('Invalid URL. Make sure it starts with http:// or https://'); return; }
 
-  const links = loadLinks();
-  if (custom && links.some(l => l.customName === custom || l.shortId === custom)) {
-    showErrorDialog('That custom name is already taken.');
-    return;
-  }
-
   const shortId = custom || genId();
-  const fullUrl = `${APP_ORIGIN}?s=${shortId}`;
-  const displayUrl = `${DISPLAY_ORIGIN}?s=${shortId}`;
-  const qrUrl = `${APP_ORIGIN}?s=${shortId}&o=${encodeURIComponent(url)}`;
-  links.unshift({ original: url, shortId, customName: custom || '', clicks: 0, createdAt: Date.now() });
-  saveLinks(links);
+  shortenBtn.disabled = true;
 
-  lastCreatedUrl = fullUrl;
-  lastDisplayUrl = displayUrl;
-  lastQrUrl = qrUrl;
-  resultUrl.value = displayUrl;
-  resultPanel.classList.add('active');
-  statusText.textContent = `Snipped: ${shortId}`;
+  try {
+    // Save to the global Vercel Database
+    const res = await fetch('/api/shorten', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shortId, url })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      showErrorDialog(data.error || 'Server error.');
+      shortenBtn.disabled = false;
+      return;
+    }
+    
+    // Save locally to display in the user's dashboard UI
+    const links = loadLinks();
+    const fullUrl = `${APP_ORIGIN}?s=${shortId}`;
+    const displayUrl = `${DISPLAY_ORIGIN}?s=${shortId}`;
+    const qrUrl = `${APP_ORIGIN}?s=${shortId}&o=${encodeURIComponent(url)}`;
+    
+    links.unshift({ original: url, shortId, customName: custom || '', clicks: 0, createdAt: Date.now() });
+    saveLinks(links);
 
-  renderLinks();
-  showSuccessDialog();
+    lastCreatedUrl = fullUrl;
+    lastDisplayUrl = displayUrl;
+    lastQrUrl = qrUrl;
+    resultUrl.value = displayUrl;
+    resultPanel.classList.add('active');
+    statusText.textContent = `Snipped: ${shortId}`;
+
+    renderLinks();
+    showSuccessDialog();
+  } catch (err) {
+    showErrorDialog('Network error connecting to global database.');
+  } finally {
+    shortenBtn.disabled = false;
+  }
 });
 
 clearBtn.addEventListener('click', () => {
