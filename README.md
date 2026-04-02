@@ -18,7 +18,7 @@
 - **Custom Aliases:** Choose exactly what you want your short link to be called (e.g., `snippit.io/my-link`).
 - **QR Code Generator:** View and download customized QR codes for any snipped link in a retro dialog window.
 - **Click Tracking:** A built-in "Snipped Links" dashboard tracking how many times your links are clicked.
-- **Local Persistence:** Everything is saved locally in your browser's `localStorage` — no database required.
+- **Local Persistence:** Everything is saved in Vercel KV database which allows 30,000 clicks per month.
 - **Web Audio FX:** Satisfying 8-bit, square-wave sound "blips" on every button click.
 
 ## 🛠️ Technology Stack
